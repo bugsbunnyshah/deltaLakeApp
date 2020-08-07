@@ -27,20 +27,23 @@ public class CRUDAppTests
                     .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
                     .getOrCreate();
 
+            //Initialize the Data
             System.out.println("INIT_DATA");
             Dataset<Long> data = spark.range(0, 5);
             data.write().format("delta").save(location);
             Dataset<Row> df = spark.read().format("delta").load(location);
             df.show();
 
+            //Read the data back in Stream format
             //StreamingQuery stream = spark.readStream().format("delta").
             //        load(location).writeStream().
             //        format("console").start();
             //System.out.println(stream.toString());
 
+            //Overwrite the data to see if the data got stored in a new data set
             System.out.println("OVERWRITE_DATA");
             data = spark.range(5, 10);
-            location = "/tmp/delta-table-"+ UUID.randomUUID().toString();
+            //location = "/tmp/delta-table-"+ UUID.randomUUID().toString();
             data.write().format("delta").mode("overwrite").save(location);
             df = spark.read().format("delta").load(location);
             df.show();
@@ -58,12 +61,19 @@ public class CRUDAppTests
             deltaTable.toDF().show();
 
 
-            System.out.println("TIMETRAVEL_DATA");
+            //Read in the old overwritten data set
+            System.out.println("TIMETRAVEL_DATA_ORIGINAL");
             df = spark.read().format("delta").option("versionAsOf", 0).load(location);
             df.show();
 
-            System.out.println("TIMETRAVEL_DATA");
+            //Read in the updated data set
+            System.out.println("TIMETRAVEL_DATA_UPDATED");
             df = spark.read().format("delta").option("versionAsOf", 1).load(location);
+            df.show();
+
+            //Read in the latest/live data set
+            System.out.println("TIMETRAVEL_DATA_LATEST_LIVE");
+            df = spark.read().format("delta").option("versionAsOf", 2).load(location);
             df.show();
 
             spark.close();
@@ -85,15 +95,10 @@ public class CRUDAppTests
                 .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
                 .getOrCreate();
 
+        //Read the DataSet in a Stream format and write to another location in stream format
         Dataset<Row> streamingDf = spark.readStream().format("rate").load();
-        //streamingDf.show();
-        StreamingQuery stream = streamingDf.selectExpr("value as id").writeStream().
-                format("delta").
+        StreamingQuery stream = streamingDf.selectExpr("value as id").writeStream().format("delta").
                 option("checkpointLocation", "/tmp/checkpoint").start(location);
-
-        //spark.readStream().format("delta").
-        //        load(location).writeStream().
-        //        format("console").start();
 
         spark.close();
     }
